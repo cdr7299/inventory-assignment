@@ -5,6 +5,7 @@ import {
   type ColumnDef,
 } from "@tanstack/react-table";
 import { motion } from "motion/react";
+import { ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -15,12 +16,16 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 import type { Product } from "@/types/product";
 
 interface ProductTableProps {
   products: Product[];
   isLoading?: boolean;
   error?: Error | null;
+  sortBy?: "price" | "stock" | "title";
+  sortOrder?: "asc" | "desc";
+  onSortChange?: (sortBy: "price" | "stock" | "title") => void;
 }
 
 function TableRowSkeleton() {
@@ -72,10 +77,65 @@ function ErrorState({ error }: { error: Error }) {
   );
 }
 
+interface SortableHeaderProps {
+  children: React.ReactNode;
+  sortKey: "price" | "stock" | "title";
+  currentSortBy?: "price" | "stock" | "title";
+  currentSortOrder?: "asc" | "desc";
+  onSort?: (sortBy: "price" | "stock" | "title") => void;
+}
+
+function SortableHeader({
+  children,
+  sortKey,
+  currentSortBy,
+  currentSortOrder,
+  onSort,
+}: SortableHeaderProps) {
+  const isActive = currentSortBy === sortKey;
+
+  const getSortIcon = () => {
+    const iconClass = sortKey === "price" ? "mr-2 order-first" : "ml-2";
+
+    if (!isActive) {
+      return (
+        <ArrowUpDown
+          className={`h-4 w-4 opacity-50 group-hover:opacity-75 transition-opacity ${iconClass}`}
+        />
+      );
+    }
+    return currentSortOrder === "asc" ? (
+      <ArrowUp className={`h-4 w-4 text-primary ${iconClass}`} />
+    ) : (
+      <ArrowDown className={`h-4 w-4 text-primary ${iconClass}`} />
+    );
+  };
+
+  return (
+    <button
+      className={cn(
+        "flex items-center space-x-1 hover:bg-muted/50 rounded-md px-2 py-1 transition-colors group w-full font-medium",
+        "text-left justify-start",
+        sortKey === "price" && "justify-end text-right",
+        sortKey === "stock" && "justify-center text-center",
+        isActive && "text-primary"
+      )}
+      onClick={() => onSort?.(sortKey)}
+      disabled={!onSort}
+    >
+      <span>{children}</span>
+      {onSort && getSortIcon()}
+    </button>
+  );
+}
+
 export function ProductTable({
   products,
   isLoading,
   error,
+  sortBy,
+  sortOrder,
+  onSortChange,
 }: ProductTableProps) {
   const columns: ColumnDef<Product>[] = [
     {
@@ -101,7 +161,16 @@ export function ProductTable({
     },
     {
       accessorKey: "title",
-      header: "Product Name",
+      header: () => (
+        <SortableHeader
+          sortKey="title"
+          currentSortBy={sortBy}
+          currentSortOrder={sortOrder}
+          onSort={onSortChange}
+        >
+          Product Name
+        </SortableHeader>
+      ),
       minSize: 250,
       cell: ({ row }) => (
         <div className="font-medium text-foreground">{row.original.title}</div>
@@ -119,7 +188,16 @@ export function ProductTable({
     },
     {
       accessorKey: "price",
-      header: "Price",
+      header: () => (
+        <SortableHeader
+          sortKey="price"
+          currentSortBy={sortBy}
+          currentSortOrder={sortOrder}
+          onSort={onSortChange}
+        >
+          Price
+        </SortableHeader>
+      ),
       size: 96,
       cell: ({ row }) => (
         <div className="font-semibold text-foreground text-right">
@@ -129,7 +207,16 @@ export function ProductTable({
     },
     {
       accessorKey: "stock",
-      header: "Stock",
+      header: () => (
+        <SortableHeader
+          sortKey="stock"
+          currentSortBy={sortBy}
+          currentSortOrder={sortOrder}
+          onSort={onSortChange}
+        >
+          Stock
+        </SortableHeader>
+      ),
       size: 80,
       cell: ({ row }) => (
         <div className="text-center font-medium">{row.original.stock}</div>

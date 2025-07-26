@@ -3,6 +3,7 @@ import type {
   ProductsApiResponse,
   ProductFilters,
   PaginationParams,
+  Category,
 } from "@/types/product";
 
 const BASE_URL = "https://dummyjson.com";
@@ -35,42 +36,73 @@ class ProductsApi {
     filters = {},
   }: FetchProductsParams): Promise<ProductsApiResponse> {
     try {
-      const skip = (page - 1) * limit;
-      const params: Record<string, string | number> = {
-        limit,
-        skip,
-      };
+      let allProducts: Product[] = [];
 
-      // Handle search
-      let endpoint = "/products";
-      if (filters.search) {
-        endpoint = "/products/search";
-        params.q = filters.search;
+      // If categories are selected, fetch from each category endpoint
+      if (filters.categories && filters.categories.length > 0) {
+        const categoryPromises = filters.categories.map(async (category) => {
+          const url = this.buildUrl(`/products/category/${category}`);
+          const response = await fetch(url);
+          if (!response.ok) {
+            throw new Error(
+              `Failed to fetch category ${category}: ${response.statusText}`
+            );
+          }
+          const data: ProductsApiResponse = await response.json();
+          return data.products;
+        });
+
+        const categoryResults = await Promise.all(categoryPromises);
+        allProducts = categoryResults.flat();
+
+        // Remove duplicates by id (in case a product appears in multiple categories)
+        const uniqueProducts = allProducts.filter(
+          (product, index, self) =>
+            self.findIndex((p) => p.id === product.id) === index
+        );
+        allProducts = uniqueProducts;
+      } else {
+        // No category filter - fetch all products or search
+        let endpoint = "/products";
+        const params: Record<string, string | number> = {
+          limit: 0, // Get all products for proper filtering
+        };
+
+        if (filters.search) {
+          endpoint = "/products/search";
+          params.q = filters.search;
+          params.limit = 0; // Get all search results
+        }
+
+        const url = this.buildUrl(endpoint, params);
+        const response = await fetch(url);
+
+        if (!response.ok) {
+          throw new Error(`Failed to fetch products: ${response.statusText}`);
+        }
+
+        const data: ProductsApiResponse = await response.json();
+        allProducts = data.products;
       }
 
-      const url = this.buildUrl(endpoint, params);
-      const response = await fetch(url);
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch products: ${response.statusText}`);
-      }
-
-      const data: ProductsApiResponse = await response.json();
-
-      // Apply client-side filtering and sorting if needed
-      let products = data.products;
-
-      // Filter by category if specified
-      if (filters.category && filters.category !== "all") {
-        products = products.filter(
+      // Apply search filter client-side if we have categories (since we can't combine category + search in API)
+      if (
+        filters.search &&
+        filters.categories &&
+        filters.categories.length > 0
+      ) {
+        const searchTerm = filters.search.toLowerCase();
+        allProducts = allProducts.filter(
           (product) =>
-            product.category.toLowerCase() === filters.category!.toLowerCase()
+            product.title.toLowerCase().includes(searchTerm) ||
+            product.description.toLowerCase().includes(searchTerm) ||
+            product.category.toLowerCase().includes(searchTerm)
         );
       }
 
       // Apply sorting
       if (filters.sortBy) {
-        products = [...products].sort((a, b) => {
+        allProducts = [...allProducts].sort((a, b) => {
           const { sortBy, sortOrder = "asc" } = filters;
           let aValue: number | string;
           let bValue: number | string;
@@ -98,13 +130,16 @@ class ProductsApi {
         });
       }
 
+      // Apply client-side pagination
+      const total = allProducts.length;
+      const skip = (page - 1) * limit;
+      const paginatedProducts = allProducts.slice(skip, skip + limit);
+
       return {
-        ...data,
-        products,
-        total:
-          filters.category && filters.category !== "all"
-            ? products.length
-            : data.total,
+        products: paginatedProducts,
+        total,
+        skip,
+        limit,
       };
     } catch (error) {
       console.error("Error fetching products:", error);
@@ -128,7 +163,7 @@ class ProductsApi {
     }
   }
 
-  async fetchCategories(): Promise<string[]> {
+  async fetchCategories(): Promise<Category[]> {
     try {
       const url = this.buildUrl("/products/categories");
       const response = await fetch(url);

@@ -40,6 +40,13 @@ export interface Review {
   reviewerEmail: string;
 }
 
+// Add new Category interface to match API response
+export interface Category {
+  slug: string;
+  name: string;
+  url: string;
+}
+
 export interface ProductsApiResponse {
   products: Product[];
   total: number;
@@ -59,7 +66,7 @@ export interface ProductTableData {
 
 export interface ProductFilters {
   search?: string;
-  category?: string;
+  categories?: string[]; // Changed from category to categories array
   sortBy?: "price" | "stock" | "title";
   sortOrder?: "asc" | "desc";
 }

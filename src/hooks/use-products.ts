@@ -5,6 +5,7 @@ import type {
   Product,
   ProductFilters,
   PaginationParams,
+  Category,
 } from "@/types/product";
 
 interface UseProductsParams extends PaginationParams {
@@ -35,7 +36,7 @@ export function useProduct(id: number): UseQueryResult<Product, Error> {
   });
 }
 
-export function useCategories(): UseQueryResult<string[], Error> {
+export function useCategories(): UseQueryResult<Category[], Error> {
   return useQuery({
     queryKey: ["categories"],
     queryFn: () => productsApi.fetchCategories(),

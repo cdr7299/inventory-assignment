@@ -3,15 +3,22 @@ import { useState, useMemo, useEffect } from "react";
 import { motion } from "motion/react";
 import { Search, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { useProducts } from "@/hooks/use-products";
+import { useProducts, useCategories } from "@/hooks/use-products";
 import { ProductTable } from "@/components/products/product-table";
 import { ProductPagination } from "@/components/products/product-pagination";
+import {
+  CategoryMultiselect,
+  SelectedCategoriesDisplay,
+} from "@/components/products/category-multiselect";
 import { useDebounce } from "@/hooks/use-debounce";
 import type { ProductFilters } from "@/types/product";
 
 interface ProductsSearch {
   search?: string;
+  categories?: string;
   page?: number;
+  sortBy?: string;
+  sortOrder?: string;
 }
 
 export const Route = createFileRoute("/products/")({
@@ -19,23 +26,43 @@ export const Route = createFileRoute("/products/")({
   validateSearch: (search: Record<string, unknown>): ProductsSearch => {
     return {
       search: (search.search as string) || "",
+      categories: (search.categories as string) || "",
       page: Number(search.page) || 1,
+      sortBy: (search.sortBy as string) || "",
+      sortOrder: (search.sortOrder as string) || "",
     };
   },
 });
 
 function ProductsPage() {
-  const { search: searchParam, page } = Route.useSearch();
+  const {
+    search: searchParam,
+    categories: categoriesParam,
+    page,
+    sortBy: sortByParam,
+    sortOrder: sortOrderParam,
+  } = Route.useSearch();
   const navigate = Route.useNavigate();
 
   const [searchInput, setSearchInput] = useState(searchParam || "");
   const debouncedSearch = useDebounce(searchInput, 500);
 
+  // Parse categories from URL parameter (comma-separated string)
+  const selectedCategories = useMemo(() => {
+    return categoriesParam ? categoriesParam.split(",").filter(Boolean) : [];
+  }, [categoriesParam]);
+
+  const { data: categories = [] } = useCategories();
+
   const filters: ProductFilters = useMemo(
     () => ({
       search: debouncedSearch || undefined,
+      categories:
+        selectedCategories.length > 0 ? selectedCategories : undefined,
+      sortBy: (sortByParam as "price" | "stock" | "title") || undefined,
+      sortOrder: (sortOrderParam as "asc" | "desc") || undefined,
     }),
-    [debouncedSearch]
+    [debouncedSearch, selectedCategories, sortByParam, sortOrderParam]
   );
 
   const { data, isLoading, error, isFetching } = useProducts({
@@ -64,14 +91,71 @@ function ProductsPage() {
     setSearchInput(value);
     // Reset to page 1 when searching
     navigate({
-      search: { search: value || undefined, page: 1 },
+      search: {
+        search: value || undefined,
+        categories: categoriesParam || undefined,
+        page: 1,
+        sortBy: sortByParam || undefined,
+        sortOrder: sortOrderParam || undefined,
+      },
+      replace: true,
+    });
+  };
+
+  const handleCategoriesChange = (newCategories: string[]) => {
+    // Reset to page 1 when filtering
+    navigate({
+      search: {
+        search: searchInput || undefined,
+        categories:
+          newCategories.length > 0 ? newCategories.join(",") : undefined,
+        page: 1,
+        sortBy: sortByParam || undefined,
+        sortOrder: sortOrderParam || undefined,
+      },
+      replace: true,
+    });
+  };
+
+  const handleRemoveCategory = (categorySlug: string) => {
+    const newCategories = selectedCategories.filter(
+      (cat) => cat !== categorySlug
+    );
+    handleCategoriesChange(newCategories);
+  };
+
+  const handleSortChange = (sortBy: "price" | "stock" | "title") => {
+    const currentSortBy = sortByParam;
+    const currentSortOrder = sortOrderParam;
+
+    // If clicking the same column, toggle order; otherwise set to 'asc'
+    let newSortOrder: "asc" | "desc" = "asc";
+    if (currentSortBy === sortBy && currentSortOrder === "asc") {
+      newSortOrder = "desc";
+    }
+
+    // Reset to page 1 when sorting
+    navigate({
+      search: {
+        search: searchInput || undefined,
+        categories: categoriesParam || undefined,
+        page: 1,
+        sortBy,
+        sortOrder: newSortOrder,
+      },
       replace: true,
     });
   };
 
   const handlePageChange = (newPage: number) => {
     navigate({
-      search: { search: searchInput || undefined, page: newPage },
+      search: {
+        search: searchInput || undefined,
+        categories: categoriesParam || undefined,
+        page: newPage,
+        sortBy: sortByParam || undefined,
+        sortOrder: sortOrderParam || undefined,
+      },
       replace: true,
     });
   };
@@ -94,27 +178,43 @@ function ProductsPage() {
           </p>
         </div>
 
-        {/* Search Bar */}
-        <div className="flex items-center space-x-4">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-            <Input
-              placeholder="Search products..."
-              value={searchInput}
-              onChange={(e) => handleSearchChange(e.target.value)}
-              className="pl-10 pr-4"
+        {/* Filters */}
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center gap-4">
+            {/* Search Bar */}
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+              <Input
+                placeholder="Search products..."
+                value={searchInput}
+                onChange={(e) => handleSearchChange(e.target.value)}
+                className="pl-10 pr-4"
+              />
+              {isFetching && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2"
+                >
+                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                </motion.div>
+              )}
+            </div>
+
+            {/* Category Filter */}
+            <CategoryMultiselect
+              selectedCategories={selectedCategories}
+              onSelectionChange={handleCategoriesChange}
             />
-            {isFetching && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2"
-              >
-                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-              </motion.div>
-            )}
           </div>
+
+          {/* Selected Categories Display */}
+          <SelectedCategoriesDisplay
+            selectedCategories={selectedCategories}
+            categories={categories}
+            onRemoveCategory={handleRemoveCategory}
+          />
         </div>
       </motion.div>
 
@@ -124,6 +224,9 @@ function ProductsPage() {
           products={data?.products || []}
           isLoading={isLoading}
           error={error}
+          sortBy={sortByParam as "price" | "stock" | "title" | undefined}
+          sortOrder={sortOrderParam as "asc" | "desc" | undefined}
+          onSortChange={handleSortChange}
         />
       </div>
 
