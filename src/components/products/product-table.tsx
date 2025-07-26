@@ -5,7 +5,7 @@ import {
   type ColumnDef,
 } from "@tanstack/react-table";
 import { motion } from "motion/react";
-import { ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { ArrowUpDown, ArrowUp, ArrowDown, Edit3, Check, X } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -16,7 +16,15 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import { useProductEdit } from "@/hooks/use-product-edit";
 import type { Product } from "@/types/product";
 
 interface ProductTableProps {
@@ -129,6 +137,118 @@ function SortableHeader({
   );
 }
 
+interface EditableFieldProps {
+  product: Product;
+  field: "name" | "price" | "stock";
+  className?: string;
+  children: React.ReactNode;
+}
+
+function EditableField({
+  product,
+  field,
+  className,
+  children,
+}: EditableFieldProps) {
+  const productEdit = useProductEdit();
+  const isEditing = productEdit.isEditing(product.id, field);
+  const isUpdating = productEdit.isUpdating && isEditing;
+
+  const handleOpenChange = (open: boolean) => {
+    if (open) {
+      productEdit.startEditing(product, field);
+    } else if (!isUpdating) {
+      productEdit.cancelEditing();
+    }
+  };
+
+  const getInputType = () => {
+    switch (field) {
+      case "price":
+        return "number";
+      case "stock":
+        return "number";
+      default:
+        return "text";
+    }
+  };
+
+  const getPlaceholder = () => {
+    switch (field) {
+      case "name":
+        return "Enter product name";
+      case "price":
+        return "Enter price";
+      case "stock":
+        return "Enter stock quantity";
+      default:
+        return "";
+    }
+  };
+
+  return (
+    <Popover open={isEditing} onOpenChange={handleOpenChange}>
+      <PopoverTrigger asChild>
+        <div
+          className={cn(
+            "cursor-pointer hover:bg-muted/50 rounded px-2 py-1 transition-colors group inline-flex items-center gap-1",
+            className
+          )}
+        >
+          {children}
+          <Edit3 className="h-4 w-4 opacity-0 group-hover:opacity-50 transition-opacity" />
+        </div>
+      </PopoverTrigger>
+      <PopoverContent className="w-64 p-3" align="center" sideOffset={5}>
+        <div className="space-y-3">
+          <div className="text-sm font-medium text-center">
+            Edit{" "}
+            {field === "name"
+              ? "Product Name"
+              : field === "price"
+              ? "Price"
+              : "Stock"}
+          </div>
+          <div className="space-y-4">
+            <Input
+              type={getInputType()}
+              value={productEdit.tempValue}
+              onChange={(e) => productEdit.setTempValue(e.target.value)}
+              onKeyDown={productEdit.handleKeyPress}
+              className="text-center"
+              disabled={isUpdating}
+              autoFocus
+              min={field !== "name" ? "0" : undefined}
+              step={field === "price" ? "0.01" : undefined}
+              placeholder={getPlaceholder()}
+            />
+            <div className="flex gap-2 justify-center">
+              <Button
+                size="sm"
+                onClick={productEdit.saveEdit}
+                disabled={isUpdating}
+                className="flex items-center gap-1"
+              >
+                <Check className="h-3 w-3" />
+                {isUpdating ? "Saving..." : "Save"}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={productEdit.cancelEditing}
+                disabled={isUpdating}
+              >
+                <X className="h-3 w-3" />
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 export function ProductTable({
   products,
   isLoading,
@@ -171,9 +291,27 @@ export function ProductTable({
           Product Name
         </SortableHeader>
       ),
-      minSize: 250,
+      minSize: 300,
       cell: ({ row }) => (
-        <div className="font-medium text-foreground">{row.original.title}</div>
+        <div className="space-y-1">
+          <EditableField
+            product={row.original}
+            field="name"
+            className="font-medium text-foreground w-fit"
+          >
+            <span>{row.original.title}</span>
+          </EditableField>
+          <Popover>
+            <PopoverTrigger asChild>
+              <div className="text-sm text-muted-foreground line-clamp-2 cursor-pointer hover:bg-muted/30 rounded p-1 transition-colors">
+                {row.original.description}
+              </div>
+            </PopoverTrigger>
+            <PopoverContent side="bottom" className="max-w-sm p-3">
+              <div className="text-sm">{row.original.description}</div>
+            </PopoverContent>
+          </Popover>
+        </div>
       ),
     },
     {
@@ -200,8 +338,14 @@ export function ProductTable({
       ),
       size: 96,
       cell: ({ row }) => (
-        <div className="font-semibold text-foreground text-right">
-          ${row.original.price.toFixed(2)}
+        <div className="text-right">
+          <EditableField
+            product={row.original}
+            field="price"
+            className="font-semibold text-foreground justify-end"
+          >
+            <span>${row.original.price.toFixed(2)}</span>
+          </EditableField>
         </div>
       ),
     },
@@ -219,7 +363,15 @@ export function ProductTable({
       ),
       size: 80,
       cell: ({ row }) => (
-        <div className="text-center font-medium">{row.original.stock}</div>
+        <div className="text-center">
+          <EditableField
+            product={row.original}
+            field="stock"
+            className="font-medium justify-center"
+          >
+            <span>{row.original.stock}</span>
+          </EditableField>
+        </div>
       ),
     },
     {

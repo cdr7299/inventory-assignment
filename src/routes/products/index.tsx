@@ -1,8 +1,9 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, useMemo, useEffect } from "react";
 import { motion } from "motion/react";
-import { Search, Loader2 } from "lucide-react";
+import { Search, Loader2, Plus } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { useProducts, useCategories } from "@/hooks/use-products";
 import { ProductTable } from "@/components/products/product-table";
 import { ProductPagination } from "@/components/products/product-pagination";
@@ -169,13 +170,21 @@ function ProductsPage() {
         transition={{ duration: 0.4 }}
         className="flex-shrink-0 space-y-4"
       >
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">
-            Product Inventory
-          </h1>
-          <p className="text-muted-foreground">
-            Manage and view your product inventory with real-time data
-          </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight text-foreground">
+              Product Inventory
+            </h1>
+            <p className="text-muted-foreground">
+              Manage and view your product inventory with real-time data
+            </p>
+          </div>
+          <Button asChild>
+            <Link to="/products/new" className="flex items-center gap-2">
+              <Plus className="h-4 w-4" />
+              Add Product
+            </Link>
+          </Button>
         </div>
 
         {/* Filters */}
@@ -185,7 +194,7 @@ function ProductsPage() {
             <div className="relative flex-1 max-w-md">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
               <Input
-                placeholder="Search products..."
+                placeholder="Search products, descriptions, categories..."
                 value={searchInput}
                 onChange={(e) => handleSearchChange(e.target.value)}
                 className="pl-10 pr-4"

@@ -38,6 +38,11 @@ class ProductsApi {
     try {
       let allProducts: Product[] = [];
 
+      // Get localStorage products first
+      const localProducts: Product[] = JSON.parse(
+        localStorage.getItem("localProducts") || "[]"
+      );
+
       // If categories are selected, fetch from each category endpoint
       if (filters.categories && filters.categories.length > 0) {
         const categoryPromises = filters.categories.map(async (category) => {
@@ -61,18 +66,48 @@ class ProductsApi {
             self.findIndex((p) => p.id === product.id) === index
         );
         allProducts = uniqueProducts;
+
+        // Also filter localStorage products by selected categories
+        const filteredLocalProducts = localProducts.filter((product) =>
+          filters.categories!.includes(product.category)
+        );
+        allProducts = [...filteredLocalProducts, ...allProducts];
+
+        // Apply product edits from localStorage
+        const productEdits = JSON.parse(
+          localStorage.getItem("productEdits") || "{}"
+        );
+        if (Object.keys(productEdits).length > 0) {
+          allProducts = allProducts.map((product) => {
+            const edits = productEdits[product.id];
+            if (edits) {
+              return {
+                ...product,
+                ...(edits.name !== undefined && { title: edits.name }),
+                ...(edits.price !== undefined && { price: edits.price }),
+                ...(edits.stock !== undefined && { stock: edits.stock }),
+              };
+            }
+            return product;
+          });
+        }
+
+        // Apply search filter client-side if we have categories (since we can't combine category + search in API)
+        if (filters.search) {
+          const searchTerm = filters.search.toLowerCase();
+          allProducts = allProducts.filter(
+            (product) =>
+              product.title.toLowerCase().includes(searchTerm) ||
+              product.description.toLowerCase().includes(searchTerm) ||
+              product.category.toLowerCase().includes(searchTerm)
+          );
+        }
       } else {
-        // No category filter - fetch all products or search
-        let endpoint = "/products";
+        // No category filter - fetch all products first, then apply search client-side
+        const endpoint = "/products";
         const params: Record<string, string | number> = {
           limit: 0, // Get all products for proper filtering
         };
-
-        if (filters.search) {
-          endpoint = "/products/search";
-          params.q = filters.search;
-          params.limit = 0; // Get all search results
-        }
 
         const url = this.buildUrl(endpoint, params);
         const response = await fetch(url);
@@ -83,21 +118,39 @@ class ProductsApi {
 
         const data: ProductsApiResponse = await response.json();
         allProducts = data.products;
-      }
 
-      // Apply search filter client-side if we have categories (since we can't combine category + search in API)
-      if (
-        filters.search &&
-        filters.categories &&
-        filters.categories.length > 0
-      ) {
-        const searchTerm = filters.search.toLowerCase();
-        allProducts = allProducts.filter(
-          (product) =>
-            product.title.toLowerCase().includes(searchTerm) ||
-            product.description.toLowerCase().includes(searchTerm) ||
-            product.category.toLowerCase().includes(searchTerm)
+        // Combine with localStorage products before filtering/sorting
+        allProducts = [...localProducts, ...allProducts];
+
+        // Apply product edits from localStorage BEFORE searching
+        const productEdits = JSON.parse(
+          localStorage.getItem("productEdits") || "{}"
         );
+        if (Object.keys(productEdits).length > 0) {
+          allProducts = allProducts.map((product) => {
+            const edits = productEdits[product.id];
+            if (edits) {
+              return {
+                ...product,
+                ...(edits.name !== undefined && { title: edits.name }),
+                ...(edits.price !== undefined && { price: edits.price }),
+                ...(edits.stock !== undefined && { stock: edits.stock }),
+              };
+            }
+            return product;
+          });
+        }
+
+        // Apply search filter client-side to all products (including edited titles)
+        if (filters.search) {
+          const searchTerm = filters.search.toLowerCase();
+          allProducts = allProducts.filter(
+            (product) =>
+              product.title.toLowerCase().includes(searchTerm) ||
+              product.description.toLowerCase().includes(searchTerm) ||
+              product.category.toLowerCase().includes(searchTerm)
+          );
+        }
       }
 
       // Apply sorting
