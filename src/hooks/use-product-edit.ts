@@ -2,6 +2,7 @@ import { useState, useCallback } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import type { Product } from "@/types/product";
+import { storageService } from "@/lib/storage";
 
 interface ProductEdit {
   id: number;
@@ -23,21 +24,12 @@ export function useProductEdit(options: UseProductEditOptions = {}) {
 
   const productEditMutation = useMutation({
     mutationFn: async ({ id, field, value }: ProductEdit) => {
-      // Get existing edits from localStorage
-      const existingEdits = JSON.parse(
-        localStorage.getItem("productEdits") || "{}"
-      );
+      // Use the safe storage service to update product edits
+      const success = storageService.updateProductEdit(id, field, value);
 
-      // Initialize product edits if not exists
-      if (!existingEdits[id]) {
-        existingEdits[id] = {};
+      if (!success) {
+        throw new Error("Failed to save product edit to storage");
       }
-
-      // Update the specific field for this product
-      existingEdits[id][field] = value;
-
-      // Save back to localStorage
-      localStorage.setItem("productEdits", JSON.stringify(existingEdits));
 
       // Simulate API delay
       await new Promise((resolve) => setTimeout(resolve, 300));

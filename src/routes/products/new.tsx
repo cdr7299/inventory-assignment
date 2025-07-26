@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/select";
 import { useCategories } from "@/hooks/use-products";
 import type { Product } from "@/types/product";
+import { storageService } from "@/lib/storage";
 
 const addProductSchema = z.object({
   title: z
@@ -74,11 +75,6 @@ function AddProductPage() {
 
   const onSubmit = async (data: AddProductForm) => {
     try {
-      // Get existing products from localStorage
-      const existingProducts = JSON.parse(
-        localStorage.getItem("localProducts") || "[]"
-      ) as Product[];
-
       // Create new product with a unique ID (using timestamp + random number)
       const newProduct: Product = {
         id: Date.now() + Math.floor(Math.random() * 1000),
@@ -118,9 +114,12 @@ function AddProductPage() {
         thumbnail: "",
       };
 
-      // Add to localStorage
-      const updatedProducts = [...existingProducts, newProduct];
-      localStorage.setItem("localProducts", JSON.stringify(updatedProducts));
+      // Use safe storage service to add the product
+      const success = storageService.addLocalProduct(newProduct);
+
+      if (!success) {
+        throw new Error("Failed to save product to storage");
+      }
 
       // Show success toast
       toast.success("Product added successfully!", {
@@ -129,7 +128,8 @@ function AddProductPage() {
 
       // Redirect back to products page
       navigate({ to: "/products" });
-    } catch {
+    } catch (error) {
+      console.error("Error adding product:", error);
       toast.error("Failed to add product", {
         description: "Please try again.",
       });

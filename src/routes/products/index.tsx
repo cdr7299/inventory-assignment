@@ -160,7 +160,6 @@ function ProductsPage() {
       replace: true,
     });
   };
-
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)] space-y-6">
       {/* Header */}

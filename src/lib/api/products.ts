@@ -5,6 +5,7 @@ import type {
   PaginationParams,
   Category,
 } from "@/types/product";
+import { productDataService } from "@/lib/services/product-data";
 
 const BASE_URL = "https://dummyjson.com";
 
@@ -36,12 +37,7 @@ class ProductsApi {
     filters = {},
   }: FetchProductsParams): Promise<ProductsApiResponse> {
     try {
-      let allProducts: Product[] = [];
-
-      // Get localStorage products first
-      const localProducts: Product[] = JSON.parse(
-        localStorage.getItem("localProducts") || "[]"
-      );
+      let apiProducts: Product[] = [];
 
       // If categories are selected, fetch from each category endpoint
       if (filters.categories && filters.categories.length > 0) {
@@ -58,52 +54,9 @@ class ProductsApi {
         });
 
         const categoryResults = await Promise.all(categoryPromises);
-        allProducts = categoryResults.flat();
-
-        // Remove duplicates by id (in case a product appears in multiple categories)
-        const uniqueProducts = allProducts.filter(
-          (product, index, self) =>
-            self.findIndex((p) => p.id === product.id) === index
-        );
-        allProducts = uniqueProducts;
-
-        // Also filter localStorage products by selected categories
-        const filteredLocalProducts = localProducts.filter((product) =>
-          filters.categories!.includes(product.category)
-        );
-        allProducts = [...filteredLocalProducts, ...allProducts];
-
-        // Apply product edits from localStorage
-        const productEdits = JSON.parse(
-          localStorage.getItem("productEdits") || "{}"
-        );
-        if (Object.keys(productEdits).length > 0) {
-          allProducts = allProducts.map((product) => {
-            const edits = productEdits[product.id];
-            if (edits) {
-              return {
-                ...product,
-                ...(edits.name !== undefined && { title: edits.name }),
-                ...(edits.price !== undefined && { price: edits.price }),
-                ...(edits.stock !== undefined && { stock: edits.stock }),
-              };
-            }
-            return product;
-          });
-        }
-
-        // Apply search filter client-side if we have categories (since we can't combine category + search in API)
-        if (filters.search) {
-          const searchTerm = filters.search.toLowerCase();
-          allProducts = allProducts.filter(
-            (product) =>
-              product.title.toLowerCase().includes(searchTerm) ||
-              product.description.toLowerCase().includes(searchTerm) ||
-              product.category.toLowerCase().includes(searchTerm)
-          );
-        }
+        apiProducts = categoryResults.flat();
       } else {
-        // No category filter - fetch all products first, then apply search client-side
+        // No category filter - fetch all products
         const endpoint = "/products";
         const params: Record<string, string | number> = {
           limit: 0, // Get all products for proper filtering
@@ -117,81 +70,21 @@ class ProductsApi {
         }
 
         const data: ProductsApiResponse = await response.json();
-        allProducts = data.products;
-
-        // Combine with localStorage products before filtering/sorting
-        allProducts = [...localProducts, ...allProducts];
-
-        // Apply product edits from localStorage BEFORE searching
-        const productEdits = JSON.parse(
-          localStorage.getItem("productEdits") || "{}"
-        );
-        if (Object.keys(productEdits).length > 0) {
-          allProducts = allProducts.map((product) => {
-            const edits = productEdits[product.id];
-            if (edits) {
-              return {
-                ...product,
-                ...(edits.name !== undefined && { title: edits.name }),
-                ...(edits.price !== undefined && { price: edits.price }),
-                ...(edits.stock !== undefined && { stock: edits.stock }),
-              };
-            }
-            return product;
-          });
-        }
-
-        // Apply search filter client-side to all products (including edited titles)
-        if (filters.search) {
-          const searchTerm = filters.search.toLowerCase();
-          allProducts = allProducts.filter(
-            (product) =>
-              product.title.toLowerCase().includes(searchTerm) ||
-              product.description.toLowerCase().includes(searchTerm) ||
-              product.category.toLowerCase().includes(searchTerm)
-          );
-        }
+        apiProducts = data.products;
       }
 
-      // Apply sorting
-      if (filters.sortBy) {
-        allProducts = [...allProducts].sort((a, b) => {
-          const { sortBy, sortOrder = "asc" } = filters;
-          let aValue: number | string;
-          let bValue: number | string;
-
-          switch (sortBy) {
-            case "price":
-              aValue = a.price;
-              bValue = b.price;
-              break;
-            case "stock":
-              aValue = a.stock;
-              bValue = b.stock;
-              break;
-            case "title":
-              aValue = a.title.toLowerCase();
-              bValue = b.title.toLowerCase();
-              break;
-            default:
-              return 0;
-          }
-
-          if (aValue < bValue) return sortOrder === "asc" ? -1 : 1;
-          if (aValue > bValue) return sortOrder === "asc" ? 1 : -1;
-          return 0;
-        });
-      }
-
-      // Apply client-side pagination
-      const total = allProducts.length;
-      const skip = (page - 1) * limit;
-      const paginatedProducts = allProducts.slice(skip, skip + limit);
+      // Use the data service to process products with all business logic
+      const result = productDataService.processProducts(
+        apiProducts,
+        filters,
+        page,
+        limit
+      );
 
       return {
-        products: paginatedProducts,
-        total,
-        skip,
+        products: result.products,
+        total: result.total,
+        skip: result.skip,
         limit,
       };
     } catch (error) {

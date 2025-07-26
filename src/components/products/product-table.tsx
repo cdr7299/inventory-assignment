@@ -264,18 +264,25 @@ export function ProductTable({
       size: 64,
       cell: ({ row }) => (
         <div className="flex items-center justify-center">
-          <img
-            src={row.original.thumbnail}
-            alt={row.original.title}
-            className="h-12 w-12 rounded-lg object-cover border bg-muted"
-            loading="lazy"
-            onError={(e) => {
-              const target = e.target as HTMLImageElement;
-              target.src = `https://via.placeholder.com/48x48/e5e7eb/6b7280?text=${row.original.title.charAt(
-                0
-              )}`;
-            }}
-          />
+          {row.original.thumbnail ? (
+            <img
+              src={row.original.thumbnail}
+              className="h-12 w-12 rounded-lg object-cover border bg-muted"
+              loading="lazy"
+              onError={(e) => {
+                const target = e.target as HTMLImageElement;
+                target.src = `https://via.placeholder.com/48x48/e5e7eb/6b7280?text=${row.original.title.charAt(
+                  0
+                )}`;
+              }}
+            />
+          ) : (
+            <div className="h-12 w-12 rounded-lg object-cover border bg-muted flex items-center justify-center">
+              <span className="text-lg text-muted-foreground">
+                {row.original.title.charAt(0)}
+              </span>
+            </div>
+          )}
         </div>
       ),
     },
