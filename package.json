@@ -9,7 +9,6 @@
     "type-check": "tsc --noEmit --project tsconfig.app.json",
     "type-check:watch": "tsc --noEmit --watch --project tsconfig.app.json",
     "lint": "eslint .",
-    "lint:fix": "eslint . --fix",
     "check-all": "pnpm type-check && pnpm lint",
     "preview": "vite preview"
   },
