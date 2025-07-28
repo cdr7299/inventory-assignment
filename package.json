@@ -11,6 +11,7 @@
     "lint": "eslint .",
     "check-all": "pnpm type-check && pnpm lint",
     "preview": "vite preview",
+    "predeploy": "pnpm run build",
     "deploy": "gh-pages -d dist"
   },
   "dependencies": {
