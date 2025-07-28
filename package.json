@@ -10,6 +10,7 @@
     "type-check:watch": "tsc --noEmit --watch --project tsconfig.app.json",
     "lint": "eslint .",
     "check-all": "pnpm type-check && pnpm lint",
+    "homepage": "https://cdr7299.github.io/inventory-assignment",
     "preview": "vite preview",
     "predeploy": "pnpm run build",
     "deploy": "gh-pages -d dist"
