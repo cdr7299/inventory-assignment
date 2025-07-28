@@ -1,8 +1,8 @@
-import type { Product } from "@/types/product";
+import type { Product, ProductEditField } from "@/types/product";
 
 interface ProductEdits {
   [productId: number]: {
-    name?: string;
+    title?: string;
     price?: number;
     stock?: number;
   };
@@ -100,17 +100,42 @@ class StorageService {
 
   getProductEdits(): ProductEdits {
     const data = this.safeGetItem("productEdits");
-    const edits = this.safeParse(data, {} as ProductEdits);
+    const edits = this.safeParse(data, {});
 
-    // Basic validation that it's an object
+    // Validate structure and return properly typed object
     if (typeof edits !== "object" || Array.isArray(edits) || edits === null) {
       console.warn(
         "Invalid productEdits data structure, returning empty object"
       );
-      return {} as ProductEdits;
+      return {};
     }
 
-    return edits;
+    // Additional validation for ProductEdits structure
+    const validatedEdits: ProductEdits = {};
+    for (const [key, value] of Object.entries(edits)) {
+      const productId = Number(key);
+      if (!isNaN(productId) && typeof value === "object" && value !== null) {
+        const productEdit = value as Record<string, unknown>;
+        const validEdit: { title?: string; price?: number; stock?: number } =
+          {};
+
+        if (typeof productEdit.title === "string") {
+          validEdit.title = productEdit.title;
+        }
+        if (typeof productEdit.price === "number") {
+          validEdit.price = productEdit.price;
+        }
+        if (typeof productEdit.stock === "number") {
+          validEdit.stock = productEdit.stock;
+        }
+
+        if (Object.keys(validEdit).length > 0) {
+          validatedEdits[productId] = validEdit;
+        }
+      }
+    }
+
+    return validatedEdits;
   }
 
   setProductEdits(edits: ProductEdits): boolean {
@@ -130,7 +155,7 @@ class StorageService {
 
   updateProductEdit(
     productId: number,
-    field: "name" | "price" | "stock",
+    field: ProductEditField,
     value: string | number
   ): boolean {
     const existingEdits = this.getProductEdits();
@@ -140,7 +165,7 @@ class StorageService {
     }
 
     // Type-safe assignment based on field
-    if (field === "name" && typeof value === "string") {
+    if (field === "title" && typeof value === "string") {
       existingEdits[productId][field] = value;
     } else if (
       (field === "price" || field === "stock") &&

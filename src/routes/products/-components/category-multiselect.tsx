@@ -8,8 +8,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { motion, AnimatePresence } from "motion/react";
-import { useCategories } from "@/hooks/use-products";
-import type { Category } from "@/types/product";
+import { useCategories } from "@/hooks";
 
 interface CategoryMultiselectProps {
   selectedCategories: string[];
@@ -56,7 +55,7 @@ export function CategoryMultiselect({
           variant="outline"
           role="combobox"
           aria-expanded={isOpen}
-          className="w-full max-w-sm justify-between font-normal"
+          className="w-[300px] max-w-sm justify-between font-normal"
         >
           <div className="flex items-center gap-2 flex-1 min-w-0">
             {selectedCategories.length === 0 ? (
@@ -74,9 +73,8 @@ export function CategoryMultiselect({
           <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-full max-w-sm p-0" align="start">
+      <PopoverContent className="w-[300px] max-w-sm p-0" align="start">
         <div className="flex flex-col max-h-80">
-          {/* Header with clear all */}
           {selectedCategories.length > 0 && (
             <div className="flex items-center justify-between px-3 py-2 border-b">
               <span className="text-sm text-muted-foreground">
@@ -93,7 +91,6 @@ export function CategoryMultiselect({
             </div>
           )}
 
-          {/* Category options */}
           <div className="flex-1 overflow-auto">
             {isLoading ? (
               <div className="px-3 py-6 text-center text-sm text-muted-foreground">
@@ -147,49 +144,50 @@ export function CategoryMultiselect({
 
 interface SelectedCategoriesDisplayProps {
   selectedCategories: string[];
-  categories: Category[];
   onRemoveCategory: (categorySlug: string) => void;
 }
 
 export function SelectedCategoriesDisplay({
   selectedCategories,
-  categories,
   onRemoveCategory,
 }: SelectedCategoriesDisplayProps) {
+  const { data: categories = [] } = useCategories();
   if (selectedCategories.length === 0) return null;
-
   const selectedCategoryNames = categories
     .filter((cat) => selectedCategories.includes(cat.slug))
     .map((cat) => ({ slug: cat.slug, name: cat.name }));
 
   return (
-    <div className="flex flex-wrap gap-2">
-      <AnimatePresence>
-        {selectedCategoryNames.map(({ slug, name }) => (
-          <motion.div
-            key={slug}
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.8 }}
-            transition={{ duration: 0.2 }}
+    <motion.div
+      layout
+      layoutId="selected-categories"
+      className="flex flex-wrap gap-2"
+    >
+      {selectedCategoryNames.map(({ slug, name }) => (
+        <motion.div
+          layout="position"
+          key={slug}
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.8 }}
+          transition={{ duration: 0.2 }}
+        >
+          <Badge
+            variant="secondary"
+            className="flex items-center gap-1 pl-2 pr-1 py-1"
           >
-            <Badge
+            <span className="text-xs font-medium">{name}</span>
+            <Button
               variant="secondary"
-              className="flex items-center gap-1 pl-2 pr-1 py-1"
+              size="icon"
+              className="h-auto w-auto p-0.5 rounded-full"
+              onClick={() => onRemoveCategory(slug)}
             >
-              <span className="text-xs font-medium">{name}</span>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-auto w-auto p-0.5 hover:bg-destructive hover:text-destructive-foreground rounded-full"
-                onClick={() => onRemoveCategory(slug)}
-              >
-                <X className="h-3 w-3" />
-              </Button>
-            </Badge>
-          </motion.div>
-        ))}
-      </AnimatePresence>
-    </div>
+              <X className="h-3 w-3" />
+            </Button>
+          </Badge>
+        </motion.div>
+      ))}
+    </motion.div>
   );
 }

@@ -40,38 +40,39 @@ export interface Review {
   reviewerEmail: string;
 }
 
-// Add new Category interface to match API response
 export interface Category {
   slug: string;
   name: string;
   url: string;
 }
 
-export interface ProductsApiResponse {
-  products: Product[];
-  total: number;
-  skip: number;
-  limit: number;
-}
+export type ProductSortField = "price" | "stock" | "title";
+export type SortOrder = "asc" | "desc";
+export type ProductEditField = "title" | "price" | "stock";
 
-export interface ProductTableData {
-  id: number;
-  title: string;
-  category: string;
-  price: number;
-  stock: number;
-  status: "In Stock" | "Out of Stock";
-  thumbnail: string;
+export interface ProductsSearch {
+  search?: string;
+  category?: string;
+  page?: number;
+  sortBy?: ProductSortField;
+  sortOrder?: SortOrder;
 }
 
 export interface ProductFilters {
   search?: string;
-  categories?: string[]; // Changed from category to categories array
-  sortBy?: "price" | "stock" | "title";
-  sortOrder?: "asc" | "desc";
+  selectedCategories: string[];
+  sortBy?: ProductSortField;
+  sortOrder?: SortOrder;
 }
 
 export interface PaginationParams {
   page: number;
+  limit: number;
+}
+
+export interface ProductsApiResponse {
+  products: Product[];
+  total: number;
+  skip: number;
   limit: number;
 }

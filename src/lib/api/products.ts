@@ -1,129 +1,134 @@
 import type {
   Product,
   ProductsApiResponse,
-  ProductFilters,
-  PaginationParams,
   Category,
+  ProductEditField,
 } from "@/types/product";
-import { productDataService } from "@/lib/services/product-data";
+import { createProduct, updateProduct } from "@/lib/services/product-data";
 
 const BASE_URL = "https://dummyjson.com";
 
-interface FetchProductsParams extends PaginationParams {
-  filters?: ProductFilters;
-}
+async function fetchJson<T>(url: string, context: string): Promise<T> {
+  try {
+    const response = await fetch(url);
 
-class ProductsApi {
-  private buildUrl(
-    endpoint: string,
-    params?: Record<string, string | number>
-  ): string {
-    const url = new URL(`${BASE_URL}${endpoint}`);
-
-    if (params) {
-      Object.entries(params).forEach(([key, value]) => {
-        if (value !== undefined && value !== null) {
-          url.searchParams.append(key, String(value));
-        }
-      });
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
-
-    return url.toString();
-  }
-
-  async fetchProducts({
-    page = 1,
-    limit = 10,
-    filters = {},
-  }: FetchProductsParams): Promise<ProductsApiResponse> {
-    try {
-      let apiProducts: Product[] = [];
-
-      // If categories are selected, fetch from each category endpoint
-      if (filters.categories && filters.categories.length > 0) {
-        const categoryPromises = filters.categories.map(async (category) => {
-          const url = this.buildUrl(`/products/category/${category}`);
-          const response = await fetch(url);
-          if (!response.ok) {
-            throw new Error(
-              `Failed to fetch category ${category}: ${response.statusText}`
-            );
-          }
-          const data: ProductsApiResponse = await response.json();
-          return data.products;
-        });
-
-        const categoryResults = await Promise.all(categoryPromises);
-        apiProducts = categoryResults.flat();
-      } else {
-        // No category filter - fetch all products
-        const endpoint = "/products";
-        const params: Record<string, string | number> = {
-          limit: 0, // Get all products for proper filtering
-        };
-
-        const url = this.buildUrl(endpoint, params);
-        const response = await fetch(url);
-
-        if (!response.ok) {
-          throw new Error(`Failed to fetch products: ${response.statusText}`);
-        }
-
-        const data: ProductsApiResponse = await response.json();
-        apiProducts = data.products;
-      }
-
-      // Use the data service to process products with all business logic
-      const result = productDataService.processProducts(
-        apiProducts,
-        filters,
-        page,
-        limit
-      );
-
-      return {
-        products: result.products,
-        total: result.total,
-        skip: result.skip,
-        limit,
-      };
-    } catch (error) {
-      console.error("Error fetching products:", error);
-      throw error;
-    }
-  }
-
-  async fetchProductById(id: number): Promise<Product> {
-    try {
-      const url = this.buildUrl(`/products/${id}`);
-      const response = await fetch(url);
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch product: ${response.statusText}`);
-      }
-
-      return response.json();
-    } catch (error) {
-      console.error(`Error fetching product ${id}:`, error);
-      throw error;
-    }
-  }
-
-  async fetchCategories(): Promise<Category[]> {
-    try {
-      const url = this.buildUrl("/products/categories");
-      const response = await fetch(url);
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch categories: ${response.statusText}`);
-      }
-
-      return response.json();
-    } catch (error) {
-      console.error("Error fetching categories:", error);
-      throw error;
-    }
+    return response.json();
+  } catch (error) {
+    console.error(`${context}:`, error);
+    throw error;
   }
 }
 
-export const productsApi = new ProductsApi();
+async function postJson<T>(
+  url: string,
+  data: Record<string, unknown>,
+  context: string,
+  method: string = "POST"
+): Promise<T> {
+  try {
+    const response = await fetch(url, {
+      method,
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    return response.json();
+  } catch (error) {
+    console.error(`${context}:`, error);
+    throw error;
+  }
+}
+
+function buildUrl(
+  endpoint: string,
+  params?: Record<string, string | number>
+): string {
+  const url = new URL(`${BASE_URL}${endpoint}`);
+
+  if (params) {
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        url.searchParams.append(key, String(value));
+      }
+    });
+  }
+
+  return url.toString();
+}
+
+export async function fetchAllProducts(): Promise<Product[]> {
+  const url = buildUrl("/products", { limit: 0 });
+  const data = await fetchJson<ProductsApiResponse>(
+    url,
+    "Error fetching all products"
+  );
+  return data.products;
+}
+
+export async function fetchCategories(): Promise<Category[]> {
+  const url = buildUrl("/products/categories");
+  return fetchJson<Category[]>(url, "Error fetching categories");
+}
+
+export async function createProductApi(
+  productData: Omit<Product, "id" | "meta">
+): Promise<Product> {
+  try {
+    const dummyApiUrl = buildUrl("/products/add");
+    const dummyApiResponse = await postJson<Product>(
+      dummyApiUrl,
+      productData,
+      "DummyJSON create product simulation"
+    );
+    console.log("DummyJSON create simulation response:", dummyApiResponse);
+  } catch (dummyError) {
+    console.warn("DummyJSON API simulation failed:", dummyError);
+  }
+
+  const result = await createProduct(productData);
+
+  if (!result.success) {
+    throw new Error(result.errors?.join(", ") || "Failed to create product");
+  }
+
+  return result.product!;
+}
+
+export async function updateProductApi(
+  id: number,
+  field: ProductEditField,
+  value: string | number
+): Promise<{
+  id: number;
+  field: ProductEditField;
+  value: string | number;
+}> {
+  try {
+    const dummyApiUrl = buildUrl(`/products/${id}`);
+    const updateData = { [field]: value };
+    const dummyApiResponse = await postJson<Product>(
+      dummyApiUrl,
+      updateData,
+      "DummyJSON update product simulation",
+      "PUT"
+    );
+    console.log("DummyJSON update simulation response:", dummyApiResponse);
+  } catch (dummyError) {
+    console.warn("DummyJSON API simulation failed:", dummyError);
+  }
+
+  const result = await updateProduct(id, field, value);
+
+  if (!result.success) {
+    throw new Error(result.errors?.join(", ") || "Failed to update product");
+  }
+  return { id, field, value };
+}

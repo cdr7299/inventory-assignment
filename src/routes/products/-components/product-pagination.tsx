@@ -21,23 +21,16 @@ export function ProductPagination({
   onPageChange,
   isLoading = false,
 }: ProductPaginationProps) {
-  // Don't render if there's only one page or no pages
   if (totalPages <= 1) return null;
 
   const getVisiblePages = () => {
-    // If 7 or fewer pages, show all
     if (totalPages <= 7) {
       return Array.from({ length: totalPages }, (_, i) => i + 1);
     }
-
-    // For more than 7 pages, use a consistent pattern
     const pages: (number | string)[] = [];
-
     if (currentPage <= 4) {
-      // Near the beginning: [1] [2] [3] [4] [5] [...] [17]
       pages.push(1, 2, 3, 4, 5, "...", totalPages);
     } else if (currentPage >= totalPages - 3) {
-      // Near the end: [1] [...] [13] [14] [15] [16] [17]
       pages.push(
         1,
         "...",
@@ -48,7 +41,6 @@ export function ProductPagination({
         totalPages
       );
     } else {
-      // In the middle: [1] [...] [n-1] [n] [n+1] [...] [17]
       pages.push(
         1,
         "...",

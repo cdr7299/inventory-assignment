@@ -1,14 +1,7 @@
 import { useState, useCallback } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useUpdateProductMutation } from "./use-product-mutations";
 import { toast } from "sonner";
-import type { Product } from "@/types/product";
-import { storageService } from "@/lib/storage";
-
-interface ProductEdit {
-  id: number;
-  field: "name" | "price" | "stock";
-  value: string | number;
-}
+import type { Product, ProductEditField } from "@/types/product";
 
 interface UseProductEditOptions {
   onSuccess?: () => void;
@@ -17,34 +10,20 @@ interface UseProductEditOptions {
 export function useProductEdit(options: UseProductEditOptions = {}) {
   const [editingProduct, setEditingProduct] = useState<{
     id: number;
-    field: "name" | "price" | "stock";
+    field: ProductEditField;
   } | null>(null);
   const [tempValue, setTempValue] = useState<string>("");
-  const queryClient = useQueryClient();
 
-  const productEditMutation = useMutation({
-    mutationFn: async ({ id, field, value }: ProductEdit) => {
-      // Use the safe storage service to update product edits
-      const success = storageService.updateProductEdit(id, field, value);
-
-      if (!success) {
-        throw new Error("Failed to save product edit to storage");
-      }
-
-      // Simulate API delay
-      await new Promise((resolve) => setTimeout(resolve, 300));
-
-      return { id, field, value };
-    },
-    onSuccess: ({ field, value }) => {
-      // Invalidate the products query to refetch data
-      queryClient.invalidateQueries({ queryKey: ["products"] });
+  const updateMutation = useUpdateProductMutation({
+    onSuccess: (result) => {
+      const field = result.field as ProductEditField;
+      const { value } = result;
 
       const fieldLabels = {
-        name: "Product name",
+        title: "Product title",
         price: "Price",
         stock: "Stock quantity",
-      };
+      } as const;
 
       toast.success(`${fieldLabels[field]} updated successfully!`, {
         description: `${fieldLabels[field]} updated to ${
@@ -54,20 +33,19 @@ export function useProductEdit(options: UseProductEditOptions = {}) {
 
       options.onSuccess?.();
     },
-    onError: () => {
+    onError: (error: Error) => {
       toast.error("Failed to update product", {
-        description: "Please try again.",
+        description: error.message || "Please try again.",
       });
     },
   });
 
   const startEditing = useCallback(
-    (product: Product, field: "name" | "price" | "stock") => {
+    (product: Product, field: ProductEditField) => {
       setEditingProduct({ id: product.id, field });
 
-      // Set initial value based on field
       switch (field) {
-        case "name":
+        case "title":
           setTempValue(product.title);
           break;
         case "price":
@@ -92,48 +70,23 @@ export function useProductEdit(options: UseProductEditOptions = {}) {
     const { id, field } = editingProduct;
     let processedValue: string | number;
 
-    // Validate and process value based on field
+    // Basic type conversion - service layer handles validation
     switch (field) {
-      case "name":
-        if (!tempValue.trim()) {
-          toast.error("Invalid product name", {
-            description: "Product name cannot be empty.",
-          });
-          return;
-        }
+      case "title":
         processedValue = tempValue.trim();
         break;
-
-      case "price": {
-        const price = parseFloat(tempValue);
-        if (isNaN(price) || price < 0) {
-          toast.error("Invalid price", {
-            description: "Price must be a non-negative number.",
-          });
-          return;
-        }
-        processedValue = price;
+      case "price":
+        processedValue = parseFloat(tempValue);
         break;
-      }
-
-      case "stock": {
-        const stock = parseInt(tempValue, 10);
-        if (isNaN(stock) || stock < 0) {
-          toast.error("Invalid stock value", {
-            description: "Stock must be a non-negative number.",
-          });
-          return;
-        }
-        processedValue = stock;
+      case "stock":
+        processedValue = parseInt(tempValue, 10);
         break;
-      }
-
       default:
         return;
     }
 
     try {
-      await productEditMutation.mutateAsync({
+      await updateMutation.mutateAsync({
         id,
         field,
         value: processedValue,
@@ -141,9 +94,9 @@ export function useProductEdit(options: UseProductEditOptions = {}) {
 
       cancelEditing();
     } catch {
-      // Error handling is done in mutation onError
+      // Error handling is done in mutation onError and service layer
     }
-  }, [editingProduct, tempValue, productEditMutation, cancelEditing]);
+  }, [editingProduct, tempValue, updateMutation, cancelEditing]);
 
   const handleKeyPress = useCallback(
     (e: React.KeyboardEvent) => {
@@ -159,7 +112,7 @@ export function useProductEdit(options: UseProductEditOptions = {}) {
   );
 
   const isEditing = useCallback(
-    (productId: number, field: "name" | "price" | "stock") => {
+    (productId: number, field: ProductEditField) => {
       return (
         editingProduct?.id === productId && editingProduct?.field === field
       );
@@ -176,6 +129,6 @@ export function useProductEdit(options: UseProductEditOptions = {}) {
     saveEdit,
     handleKeyPress,
     isEditing,
-    isUpdating: productEditMutation.isPending,
+    isUpdating: updateMutation.isPending,
   };
 }
