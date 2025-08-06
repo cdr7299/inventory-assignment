@@ -11,7 +11,7 @@ A modern, responsive inventory management system built with React, TypeScript, a
 
 ### Prerequisites
 
-- **Node.js** (v18 or higher)
+- **Node.js** (v20 or higher)
 - **pnpm** (recommended package manager)
 
 ### Installation
